@@ -3,261 +3,926 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>网页爬虫可视化仪表盘</title>
+<title>Web Scraper Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; }
-  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
 
-  header { text-align: center; padding: 32px 0 24px; }
-  header h1 { font-size: 28px; }
-  header p { color: #666; margin-top: 6px; }
+  :root {
+    --bg: #f6f8fa;
+    --surface: #ffffff;
+    --border: #e9ecef;
+    --border-light: #f0f2f5;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --text-tertiary: #9ca3af;
+    --primary: #6366f1;
+    --primary-light: #eef2ff;
+    --primary-hover: #4f46e5;
+    --accent-1: #f59e0b;
+    --accent-2: #10b981;
+    --accent-3: #ef4444;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,.08);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-xs: 6px;
+    --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
 
-  .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-  .stat-card { flex: 1; min-width: 140px; background: #fff; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .stat-card .num { font-size: 32px; font-weight: 700; color: #1677ff; }
-  .stat-card .label { font-size: 14px; color: #888; margin-top: 4px; }
+  html { font-size: 15px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  a { color: var(--primary); text-decoration: none; transition: var(--transition); }
+  a:hover { color: var(--primary-hover); }
 
-  .panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; overflow: hidden; }
-  .panel h2 { font-size: 18px; padding: 16px 20px; background: #fafafa; border-bottom: 1px solid #eee; }
-  .panel-body { padding: 16px 20px; }
+  /* ── Layout ── */
+  .app-container { display: flex; min-height: 100vh; }
 
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
-  th { background: #fafafa; font-weight: 600; color: #555; }
-  tr:hover { background: #f5f8ff; cursor: pointer; }
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .sidebar-header {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .sidebar-logo svg { width: 28px; height: 28px; }
+  .sidebar-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; font-weight: 400; }
 
-  .file-active { background: #e6f4ff !important; }
+  .sidebar-nav {
+    padding: 12px 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .sidebar-nav-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-tertiary);
+    padding: 8px 8px 6px;
+  }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+    position: relative;
+  }
+  .file-item:hover { background: var(--bg); }
+  .file-item.active {
+    background: var(--primary-light);
+    border-color: var(--primary);
+  }
+  .file-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    color: var(--primary);
+  }
+  .file-item.active .file-icon { background: #fff; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 12px; color: var(--text-tertiary); margin-top: 1px; }
+  .file-check { color: var(--primary); font-size: 14px; opacity: 0; transition: var(--transition); }
+  .file-item.active .file-check { opacity: 1; }
 
-  .detail-section { margin-bottom: 20px; }
-  .detail-section h3 { font-size: 15px; color: #555; margin-bottom: 8px; border-left: 3px solid #1677ff; padding-left: 10px; }
-  .detail-section p, .detail-section li { font-size: 14px; line-height: 1.7; }
-  .detail-section ul { list-style: none; }
-  .detail-section li { padding: 4px 0; border-bottom: 1px solid #f5f5f5; }
-  .detail-section a { color: #1677ff; text-decoration: none; }
-  .detail-section a:hover { text-decoration: underline; }
-  .text-preview { max-height: 300px; overflow-y: auto; background: #f9f9f9; padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-align: center;
+  }
 
-  .headings-tree { }
-  .headings-tree .h3 { padding-left: 20px; color: #666; }
-  .headings-tree .h4 { padding-left: 40px; color: #888; font-size: 13px; }
+  /* ── Main ── */
+  .main-content {
+    flex: 1;
+    padding: 32px 40px;
+    max-width: calc(100vw - 280px);
+    overflow-x: hidden;
+  }
 
-  .badge { display: inline-block; background: #1677ff; color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  /* ── Top Bar ── */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 32px;
+  }
+  .top-bar h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .top-bar p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+  .top-bar-actions { display: flex; gap: 8px; align-items: center; }
 
-  .empty { text-align: center; padding: 40px; color: #999; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-xs);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+  }
+  .btn:hover { background: var(--bg); border-color: #d1d5db; }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 
-  #loading { display: none; text-align: center; padding: 40px; color: #999; }
-  #loading.show { display: block; }
+  /* ── Stats Grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 20px;
+    border: 1px solid var(--border);
+    transition: var(--transition);
+  }
+  .stat-card:hover { box-shadow: var(--shadow-md); }
+  .stat-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .stat-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .stat-icon.blue { background: #eef2ff; color: #6366f1; }
+  .stat-icon.green { background: #ecfdf5; color: #10b981; }
+  .stat-icon.amber { background: #fffbeb; color: #f59e0b; }
+  .stat-icon.red { background: #fef2f2; color: #ef4444; }
+  .stat-trend {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 
-  @media (max-width: 640px) {
-    .container { padding: 12px; }
-    .stats { flex-direction: column; }
+  /* ── Detail Panel ── */
+  .detail-panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .detail-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #fafbfc;
+  }
+  .detail-header-left { flex: 1; min-width: 0; }
+  .detail-header-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+  .detail-header-title {
+    font-size: 17px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .detail-header-right { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .detail-body { padding: 24px; }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-btn:hover { color: var(--text); background: var(--bg); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tab-badge {
+    font-size: 11px;
+    background: var(--bg);
+    padding: 1px 7px;
+    border-radius: 20px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .tab-btn.active .tab-badge { background: var(--primary-light); color: var(--primary); }
+
+  /* ── Info Grid ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .info-item {
+    padding: 14px 16px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+  }
+  .info-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); margin-bottom: 4px; }
+  .info-value { font-size: 14px; font-weight: 500; word-break: break-all; }
+  .info-value.url { color: var(--primary); font-size: 13px; font-weight: 400; }
+
+  /* ── Heading Tree ── */
+  .heading-tree {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+  .heading-node {
+    padding: 6px 0;
+    font-size: 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .heading-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--primary-light);
+    color: var(--primary);
+    flex-shrink: 0;
+    font-family: monospace;
+  }
+  .heading-node.h2 { padding-left: 0; }
+  .heading-node.h3 { padding-left: 24px; font-size: 13px; }
+  .heading-node.h4 { padding-left: 48px; font-size: 13px; color: var(--text-secondary); }
+
+  /* ── Link List ── */
+  .link-list { list-style: none; }
+  .link-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .link-item:last-child { border-bottom: none; }
+  .link-num {
+    width: 24px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .link-content { flex: 1; min-width: 0; }
+  .link-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .link-url { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Image Grid ── */
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .img-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: var(--transition);
+  }
+  .img-card:hover { box-shadow: var(--shadow-md); }
+  .img-card img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .img-card .img-alt {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Text Preview ── */
+  .text-preview {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: #374151;
+  }
+  .text-preview::-webkit-scrollbar { width: 6px; }
+  .text-preview::-webkit-scrollbar-track { background: transparent; }
+  .text-preview::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+  /* ── Empty State ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 40px;
+    color: var(--text-tertiary);
+  }
+  .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; max-width: 400px; margin: 0 auto; }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,.6);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tab Content ── */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Section Title ── */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-title .badge {
+    font-size: 11px;
+    background: var(--bg);
+    padding: 1px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  /* ── Empty detail state ── */
+  .welcome-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    color: var(--text-tertiary);
+  }
+  .welcome-view .icon { font-size: 56px; margin-bottom: 20px; }
+  .welcome-view h2 { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .welcome-view p { font-size: 14px; max-width: 360px; text-align: center; line-height: 1.7; }
+
+  /* ── Summary Stats ── */
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .summary-stat {
+    text-align: center;
+    padding: 16px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+  }
+  .summary-stat .val { font-size: 24px; font-weight: 700; color: var(--primary); }
+  .summary-stat .lbl { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+
+  /* ── Multi-page index ── */
+  .page-index {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .page-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg);
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid transparent;
+  }
+  .page-chip:hover { background: var(--border-light); }
+  .page-chip.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+  /* ── Tooltip ── */
+  .more-hint { font-size: 13px; color: var(--text-tertiary); padding: 8px 0; text-align: center; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1024px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main-content { max-width: 100vw; padding: 20px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card { padding: 16px; }
+    .info-grid { grid-template-columns: 1fr; }
+    .summary-stats { grid-template-columns: 1fr; }
+    .top-bar { flex-direction: column; gap: 12px; }
   }
 </style>
 </head>
 <body>
-<div class="container" id="app">
-  <header>
-    <h1>🕷️ 网页爬虫可视化仪表盘</h1>
-    <p>浏览已爬取的网页数据，查看结构化分析结果</p>
-  </header>
 
-  <!-- 统计卡片 -->
-  <div class="stats" id="statsRow">
-    <div class="stat-card"><div class="num" id="statFiles">-</div><div class="label">数据文件</div></div>
-    <div class="stat-card"><div class="num" id="statPages">-</div><div class="label">抓取页面</div></div>
-    <div class="stat-card"><div class="num" id="statLinks">-</div><div class="label">提取链接</div></div>
-    <div class="stat-card"><div class="num" id="statImages">-</div><div class="label">提取图片</div></div>
-  </div>
+<div class="app-container">
 
-  <!-- 文件列表 -->
-  <div class="panel">
-    <h2>📂 数据文件</h2>
-    <div class="panel-body" id="fileListPanel">
-      <table>
-        <thead><tr><th style="width:50%">文件名</th><th>大小</th><th>修改时间</th></tr></thead>
-        <tbody id="fileTableBody"></tbody>
-      </table>
-      <div id="fileEmpty" class="empty">暂无数据文件，请先运行爬虫抓取页面</div>
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 28 28" fill="none">
+          <rect x="2" y="2" width="24" height="24" rx="6" fill="#6366f1"/>
+          <path d="M9 14l3 3 7-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="21" cy="7" r="2" fill="#fff"/>
+        </svg>
+        Scraper
+      </div>
+      <div class="sidebar-sub">数据分析仪表盘</div>
     </div>
-  </div>
 
-  <!-- 详情面板 -->
-  <div class="panel" id="detailPanel" style="display:none">
-    <h2>📄 页面详情 <span id="detailTitle" style="font-weight:400;font-size:14px;color:#666;margin-left:8px;"></span></h2>
-    <div class="panel-body" id="detailBody"></div>
-  </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-nav-title">数据文件</div>
+      <div id="fileList"></div>
+      <div id="sidebarEmpty" style="display:none;padding:24px 12px;text-align:center;font-size:13px;color:var(--text-tertiary);">
+        暂无数据<br>请先运行爬虫
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      共 <span id="totalFilesBadge">0</span> 个文件
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+    <div class="top-bar">
+      <div>
+        <h1>仪表盘</h1>
+        <p>查看和管理爬虫抓取的结构化数据</p>
+      </div>
+      <div class="top-bar-actions">
+        <button class="btn" onclick="location.reload()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <span class="stat-trend">文件</span>
+        </div>
+        <div class="stat-value" id="statFiles">-</div>
+        <div class="stat-label">数据文件</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <span class="stat-trend">页面</span>
+        </div>
+        <div class="stat-value" id="statPages">-</div>
+        <div class="stat-label">抓取页面</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon amber">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <span class="stat-trend">链接</span>
+        </div>
+        <div class="stat-value" id="statLinks">-</div>
+        <div class="stat-label">提取链接</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <div class="stat-icon red">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <span class="stat-trend">图片</span>
+        </div>
+        <div class="stat-value" id="statImages">-</div>
+        <div class="stat-label">提取图片</div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-header" id="detailHeader">
+        <div class="detail-header-left">
+          <div class="detail-header-label">当前页面</div>
+          <div class="detail-header-title" id="detailTitle">选择一个文件开始浏览</div>
+        </div>
+        <div class="detail-header-right">
+          <a id="detailUrlLink" href="#" target="_blank" class="btn" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            打开原网页
+          </a>
+        </div>
+      </div>
+      <div class="detail-body" id="detailBody">
+        <div class="welcome-view">
+          <div class="icon">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h2>从左侧选择一个数据文件</h2>
+          <p>选择左侧文件列表中的项目，即可查看详细的爬虫数据分析结果</p>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
 
-<!-- 加载提示 -->
-<div id="loading" class="show">⏳ 加载中...</div>
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+</div>
 
 <script>
-// ── 工具函数 ──
 const $ = id => document.getElementById(id);
+const $$ = (sel, ctx) => (ctx || document).querySelectorAll(sel);
 
+// ── Utilities ──
 function fmtSize(bytes) {
+  if (!bytes) return '0 B';
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-function fmtTime(ts) {
+function fmtDate(ts) {
   const d = new Date(ts * 1000);
-  return d.toLocaleString('zh-CN');
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return '刚刚';
+  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-// ── 加载状态 ──
+function esc(str) {
+  const el = document.createElement('div');
+  el.textContent = str;
+  return el.innerHTML;
+}
+
 function showLoading(v) {
-  $('loading').className = v ? 'show' : '';
+  $('loadingOverlay').className = 'loading-overlay' + (v ? ' show' : '');
 }
 
-// ── 加载统计数据 ──
-async function loadStats() {
-  const r = await fetch('/api/stats');
-  const d = await r.json();
-  $('statFiles').textContent = d.total_files;
-  $('statPages').textContent = d.total_pages;
-  $('statLinks').textContent = d.total_links;
-  $('statImages').textContent = d.total_images;
+// ── Sidebar items ──
+function renderFileItem(f, active) {
+  return `<div class="file-item${active ? ' active' : ''}" data-file="${esc(f.name)}" onclick="selectFile('${esc(f.name)}')">
+    <div class="file-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <div class="file-info">
+      <div class="file-name">${esc(f.name)}</div>
+      <div class="file-meta">${fmtSize(f.size)} · ${fmtDate(f.mtime)}</div>
+    </div>
+    <div class="file-check">✓</div>
+  </div>`;
 }
 
-// ── 加载文件列表 ──
+// ── Data ──
+let files = [];
 let currentFile = null;
 
-async function loadFiles() {
-  const r = await fetch('/api/files');
-  const files = await r.json();
-  const tbody = $('fileTableBody');
-  $('fileEmpty').style.display = files.length ? 'none' : 'block';
+async function loadAll() {
+  showLoading(true);
+  const [statsRes, filesRes] = await Promise.all([
+    fetch('/api/stats'),
+    fetch('/api/files')
+  ]);
+  const stats = await statsRes.json();
+  files = await filesRes.json();
 
-  tbody.innerHTML = files.map(f =>
-    `<tr data-file="${f.name}" class="${currentFile === f.name ? 'file-active' : ''}"
-         onclick="selectFile('${f.name}')">
-      <td>${f.name}</td>
-      <td>${fmtSize(f.size)}</td>
-      <td>${fmtTime(f.mtime)}</td>
-    </tr>`
-  ).join('');
+  // Stats
+  $('statFiles').textContent = stats.total_files;
+  $('statPages').textContent = stats.total_pages;
+  $('statLinks').textContent = stats.total_links;
+  $('statImages').textContent = stats.total_images;
+  $('totalFilesBadge').textContent = files.length;
+
+  // Sidebar
+  const list = $('fileList');
+  if (files.length === 0) {
+    list.innerHTML = '';
+    $('sidebarEmpty').style.display = 'block';
+    showLoading(false);
+    return;
+  }
+  $('sidebarEmpty').style.display = 'none';
+  list.innerHTML = files.map(f => renderFileItem(f, f.name === currentFile)).join('');
+
+  // Auto-select first
+  if (!currentFile || !files.some(f => f.name === currentFile)) {
+    if (files.length > 0) {
+      selectFile(files[0].name);
+    }
+  } else {
+    // Re-highlight
+    const el = list.querySelector(`.file-item[data-file="${esc(currentFile)}"]`);
+    if (el) el.classList.add('active');
+  }
+  showLoading(false);
 }
 
-// ── 选择文件查看详情 ──
+// ── Select File ──
 async function selectFile(name) {
   currentFile = name;
   showLoading(true);
-  $('detailPanel').style.display = 'none';
-  loadFiles(); // 刷新高亮
+
+  // Update sidebar highlight
+  $$('.file-item').forEach(el => el.classList.remove('active'));
+  const activeEl = document.querySelector(`.file-item[data-file="${esc(name)}"]`);
+  if (activeEl) activeEl.classList.add('active');
 
   try {
     const r = await fetch(`/api/data/${encodeURIComponent(name)}`);
     const data = await r.json();
-    renderDetail(data);
-    $('detailPanel').style.display = 'block';
-  } catch(e) {
-    $('detailBody').innerHTML = `<div class="empty">加载失败: ${e.message}</div>`;
-    $('detailPanel').style.display = 'block';
+    renderDetail(data, name);
+  } catch (e) {
+    $('detailBody').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>${esc(e.message)}</p></div>`;
   }
   showLoading(false);
 }
 
-// ── 渲染详情 ──
-function renderDetail(data) {
+// ── Render Detail ──
+function renderDetail(data, fileName) {
   const items = Array.isArray(data) ? data : (data ? [data] : []);
   const body = $('detailBody');
 
   if (items.length === 0) {
-    body.innerHTML = '<div class="empty">该文件暂无数据</div>';
-    $('detailTitle').textContent = '';
+    body.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><h3>无数据</h3><p>该文件不包含有效数据</p></div>';
+    $('detailTitle').textContent = fileName;
+    $('detailUrlLink').style.display = 'none';
     return;
   }
 
-  // 多页面摘要
-  let html = '';
+  // Multi-page index
+  let currentPage = 0;
   if (items.length > 1) {
-    html += `<div class="detail-section"><h3>📊 概览</h3><p>共 ${items.length} 个页面</p></div>`;
+    const chips = items.map((p, i) =>
+      `<span class="page-chip${i === 0 ? ' active' : ''}" data-idx="${i}" onclick="switchPage(${i})">#${i+1} ${p.title ? esc(p.title).slice(0,20) : '无标题'}</span>`
+    ).join('');
+    body.innerHTML = `<div class="page-index" id="pageIndex">${chips}</div><div id="pageContent"></div>`;
+  } else {
+    body.innerHTML = '<div id="pageContent"></div>';
   }
 
-  // 每个页面
-  items.forEach((page, idx) => {
-    const idxLabel = items.length > 1 ? `#${idx + 1} ` : '';
-    $('detailTitle').textContent = `${idxLabel}${page.title || '(无标题)'}`;
+  window._pageData = items;
+  window._currentPage = 0;
+  renderSinglePage(items[0], 0);
+}
 
-    html += `<div class="detail-section">`;
+function renderSinglePage(page, idx) {
+  const container = $('pageContent');
+  if (!container) {
+    // Single page: render directly
+    $('detailBody').innerHTML = buildDetailHTML(page);
+    updateHeader(page);
+    return;
+  }
 
-    // Meta
-    html += `<h3>🔗 基本信息</h3>
-      <ul>
-        <li><strong>URL:</strong> <a href="${page.url}" target="_blank">${page.url}</a></li>
-        <li><strong>标题:</strong> ${page.title || '-'}</li>
-        <li><strong>描述:</strong> ${page.meta_description || '-'}</li>
-        <li><strong>状态码:</strong> ${page.status_code}</li>
-      </ul>`;
+  container.innerHTML = buildDetailHTML(page);
+  updateHeader(page);
 
-    // 标题结构
-    if (page.headings && Object.keys(page.headings).length) {
-      html += `<h3>📑 标题结构</h3><div class="headings-tree">`;
-      for (const [tag, items] of Object.entries(page.headings)) {
-        items.forEach(t => {
-          html += `<div class="${tag}"><strong>${tag}:</strong> ${t}</div>`;
-        });
-      }
-      html += `</div>`;
-    }
+  // Update chip highlight
+  $$('.page-chip').forEach(c => c.classList.remove('active'));
+  const chip = document.querySelector(`.page-chip[data-idx="${idx}"]`);
+  if (chip) chip.classList.add('active');
+}
 
-    // 链接
-    if (page.links && page.links.length) {
-      html += `<h3>🔗 链接 <span class="badge">${page.links.length}</span></h3><ul>`;
-      page.links.slice(0, 20).forEach(link => {
-        html += `<li><a href="${link.url}" target="_blank">${link.text || link.url}</a></li>`;
+function switchPage(idx) {
+  const data = window._pageData;
+  if (!data || !data[idx]) return;
+  window._currentPage = idx;
+  renderSinglePage(data[idx], idx);
+}
+
+function updateHeader(page) {
+  $('detailTitle').textContent = page.title || '(无标题)';
+  const link = $('detailUrlLink');
+  if (page.url) {
+    link.href = page.url;
+    link.style.display = 'inline-flex';
+  } else {
+    link.style.display = 'none';
+  }
+}
+
+// ── Build Detail HTML ──
+function buildDetailHTML(page) {
+  let html = '';
+
+  // Summary stats bar
+  html += `<div class="summary-stats">
+    <div class="summary-stat"><div class="val">${page.links ? page.links.length : 0}</div><div class="lbl">链接</div></div>
+    <div class="summary-stat"><div class="val">${page.images ? page.images.length : 0}</div><div class="lbl">图片</div></div>
+    <div class="summary-stat"><div class="val">${page.text ? page.text.length.toLocaleString() : 0}</div><div class="lbl">文本字符</div></div>
+  </div>`;
+
+  // Tabs
+  html += `<div class="tabs">
+    <button class="tab-btn active" data-tab="info" onclick="switchTab('info')">基本信息</button>
+    ${page.headings && Object.keys(page.headings).length ? `<button class="tab-btn" data-tab="headings" onclick="switchTab('headings')">标题结构 <span class="tab-badge">${Object.values(page.headings).flat().length}</span></button>` : ''}
+    ${page.links && page.links.length ? `<button class="tab-btn" data-tab="links" onclick="switchTab('links')">链接 <span class="tab-badge">${page.links.length}</span></button>` : ''}
+    ${page.images && page.images.length ? `<button class="tab-btn" data-tab="images" onclick="switchTab('images')">图片 <span class="tab-badge">${page.images.length}</span></button>` : ''}
+    ${page.text ? `<button class="tab-btn" data-tab="text" onclick="switchTab('text')">文本预览 <span class="tab-badge">${page.text.length}</span></button>` : ''}
+  </div>`;
+
+  // Tab: Info
+  html += `<div class="tab-content active" id="tab-info">
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">页面标题</div><div class="info-value">${esc(page.title || '-')}</div></div>
+      <div class="info-item"><div class="info-label">HTTP 状态</div><div class="info-value">${page.status_code || '-'}</div></div>
+      <div class="info-item" style="grid-column:1/-1"><div class="info-label">URL</div><div class="info-value url">${esc(page.url || '-')}</div></div>
+      ${page.meta_description ? `<div class="info-item" style="grid-column:1/-1"><div class="info-label">Meta 描述</div><div class="info-value">${esc(page.meta_description)}</div></div>` : ''}
+      <div class="info-item"><div class="info-label">抓取时间</div><div class="info-value">${page.scraped_at ? new Date(page.scraped_at * 1000).toLocaleString('zh-CN') : '-'}</div></div>
+      <div class="info-item"><div class="info-label">数据来源</div><div class="info-value">${esc(page.url ? new URL(page.url).hostname : '-')}</div></div>
+    </div>
+  </div>`;
+
+  // Tab: Headings
+  if (page.headings && Object.keys(page.headings).length) {
+    html += `<div class="tab-content" id="tab-headings">
+      <div class="heading-tree">`;
+    for (const [tag, items] of Object.entries(page.headings)) {
+      items.forEach(t => {
+        html += `<div class="heading-node ${tag}"><span class="heading-tag">${tag}</span>${esc(t)}</div>`;
       });
-      if (page.links.length > 20) {
-        html += `<li style="color:#999">... 还有 ${page.links.length - 20} 个链接</li>`;
-      }
-      html += `</ul>`;
     }
+    html += `</div></div>`;
+  }
 
-    // 图片
-    if (page.images && page.images.length) {
-      html += `<h3>🖼️ 图片 <span class="badge">${page.images.length}</span></h3><ul>`;
-      page.images.slice(0, 10).forEach(img => {
-        html += `<li><a href="${img.src}" target="_blank">${img.alt || img.src}</a></li>`;
-      });
-      if (page.images.length > 10) {
-        html += `<li style="color:#999">... 还有 ${page.images.length - 10} 张图片</li>`;
-      }
-      html += `</ul>`;
+  // Tab: Links
+  if (page.links && page.links.length) {
+    html += `<div class="tab-content" id="tab-links">
+      <div class="section-title">全部链接 <span class="badge">${page.links.length}</span></div>
+      <ul class="link-list">`;
+    page.links.slice(0, 50).forEach((link, i) => {
+      html += `<li class="link-item">
+        <span class="link-num">${i + 1}</span>
+        <div class="link-content">
+          <div class="link-title">${esc(link.text || '(无文本)')}</div>
+          <div class="link-url">${esc(link.url)}</div>
+        </div>
+      </li>`;
+    });
+    if (page.links.length > 50) {
+      html += `<div class="more-hint">... 还有 ${page.links.length - 50} 个链接未显示</div>`;
     }
+    html += `</ul></div>`;
+  }
 
-    // 纯文本预览
-    if (page.text) {
-      const preview = page.text.length > 2000 ? page.text.slice(0, 2000) + '\n... (截断)' : page.text;
-      html += `<h3>📝 文本预览 <span class="badge">${page.text.length} 字符</span></h3>
-        <div class="text-preview">${escapeHtml(preview)}</div>`;
+  // Tab: Images
+  if (page.images && page.images.length) {
+    html += `<div class="tab-content" id="tab-images">
+      <div class="section-title">全部图片 <span class="badge">${page.images.length}</span></div>
+      <div class="image-grid">`;
+    page.images.slice(0, 30).forEach(img => {
+      html += `<div class="img-card">
+        <img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22120%22><rect fill=%22%23f3f4f6%22 width=%22160%22 height=%22120%22/><text x=%2280%22 y=%2260%22 text-anchor=%22middle%22 fill=%22%239ca3af%22 font-size=%2214%22>加载失败</text></svg>'">
+        <div class="img-alt">${esc(img.alt || '(无描述)')}</div>
+      </div>`;
+    });
+    if (page.images.length > 30) {
+      html += `<div class="more-hint">... 还有 ${page.images.length - 30} 张图片未显示</div>`;
     }
+    html += `</div></div>`;
+  }
 
-    html += `</div>`;
-  });
+  // Tab: Text
+  if (page.text) {
+    const preview = page.text.length > 5000 ? page.text.slice(0, 5000) + '\n\n··· 内容已截断（共 ' + page.text.length.toLocaleString() + ' 字符）···' : page.text;
+    html += `<div class="tab-content" id="tab-text">
+      <div class="section-title">页面文本 <span class="badge">${page.text.length.toLocaleString()} 字符</span></div>
+      <div class="text-preview">${esc(preview)}</div>
+    </div>`;
+  }
 
-  body.innerHTML = html;
+  return html;
 }
 
-function escapeHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+// ── Tab Switching ──
+function switchTab(name) {
+  $$('.tab-btn').forEach(b => b.classList.remove('active'));
+  $$('.tab-content').forEach(c => c.classList.remove('active'));
+  const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  const content = $(`tab-${name}`);
+  if (btn) btn.classList.add('active');
+  if (content) content.classList.add('active');
 }
 
-// ── 初始化 ──
-async function init() {
-  showLoading(true);
-  await Promise.all([loadStats(), loadFiles()]);
-  // 自动选中第一个文件
-  const firstRow = document.querySelector('#fileTableBody tr');
-  if (firstRow) firstRow.click();
-  showLoading(false);
-}
-
-init();
+// ── Init ──
+document.addEventListener('DOMContentLoaded', loadAll);
 </script>
 </body>
 </html>
