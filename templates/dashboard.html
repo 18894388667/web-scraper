@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网页爬虫可视化仪表盘</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  header { text-align: center; padding: 32px 0 24px; }
+  header h1 { font-size: 28px; }
+  header p { color: #666; margin-top: 6px; }
+
+  .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card { flex: 1; min-width: 140px; background: #fff; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .stat-card .num { font-size: 32px; font-weight: 700; color: #1677ff; }
+  .stat-card .label { font-size: 14px; color: #888; margin-top: 4px; }
+
+  .panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; overflow: hidden; }
+  .panel h2 { font-size: 18px; padding: 16px 20px; background: #fafafa; border-bottom: 1px solid #eee; }
+  .panel-body { padding: 16px 20px; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  th { background: #fafafa; font-weight: 600; color: #555; }
+  tr:hover { background: #f5f8ff; cursor: pointer; }
+
+  .file-active { background: #e6f4ff !important; }
+
+  .detail-section { margin-bottom: 20px; }
+  .detail-section h3 { font-size: 15px; color: #555; margin-bottom: 8px; border-left: 3px solid #1677ff; padding-left: 10px; }
+  .detail-section p, .detail-section li { font-size: 14px; line-height: 1.7; }
+  .detail-section ul { list-style: none; }
+  .detail-section li { padding: 4px 0; border-bottom: 1px solid #f5f5f5; }
+  .detail-section a { color: #1677ff; text-decoration: none; }
+  .detail-section a:hover { text-decoration: underline; }
+  .text-preview { max-height: 300px; overflow-y: auto; background: #f9f9f9; padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+
+  .headings-tree { }
+  .headings-tree .h3 { padding-left: 20px; color: #666; }
+  .headings-tree .h4 { padding-left: 40px; color: #888; font-size: 13px; }
+
+  .badge { display: inline-block; background: #1677ff; color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+
+  .empty { text-align: center; padding: 40px; color: #999; }
+
+  #loading { display: none; text-align: center; padding: 40px; color: #999; }
+  #loading.show { display: block; }
+
+  @media (max-width: 640px) {
+    .container { padding: 12px; }
+    .stats { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <header>
+    <h1>🕷️ 网页爬虫可视化仪表盘</h1>
+    <p>浏览已爬取的网页数据，查看结构化分析结果</p>
+  </header>
+
+  <!-- 统计卡片 -->
+  <div class="stats" id="statsRow">
+    <div class="stat-card"><div class="num" id="statFiles">-</div><div class="label">数据文件</div></div>
+    <div class="stat-card"><div class="num" id="statPages">-</div><div class="label">抓取页面</div></div>
+    <div class="stat-card"><div class="num" id="statLinks">-</div><div class="label">提取链接</div></div>
+    <div class="stat-card"><div class="num" id="statImages">-</div><div class="label">提取图片</div></div>
+  </div>
+
+  <!-- 文件列表 -->
+  <div class="panel">
+    <h2>📂 数据文件</h2>
+    <div class="panel-body" id="fileListPanel">
+      <table>
+        <thead><tr><th style="width:50%">文件名</th><th>大小</th><th>修改时间</th></tr></thead>
+        <tbody id="fileTableBody"></tbody>
+      </table>
+      <div id="fileEmpty" class="empty">暂无数据文件，请先运行爬虫抓取页面</div>
+    </div>
+  </div>
+
+  <!-- 详情面板 -->
+  <div class="panel" id="detailPanel" style="display:none">
+    <h2>📄 页面详情 <span id="detailTitle" style="font-weight:400;font-size:14px;color:#666;margin-left:8px;"></span></h2>
+    <div class="panel-body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- 加载提示 -->
+<div id="loading" class="show">⏳ 加载中...</div>
+
+<script>
+// ── 工具函数 ──
+const $ = id => document.getElementById(id);
+
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function fmtTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleString('zh-CN');
+}
+
+// ── 加载状态 ──
+function showLoading(v) {
+  $('loading').className = v ? 'show' : '';
+}
+
+// ── 加载统计数据 ──
+async function loadStats() {
+  const r = await fetch('/api/stats');
+  const d = await r.json();
+  $('statFiles').textContent = d.total_files;
+  $('statPages').textContent = d.total_pages;
+  $('statLinks').textContent = d.total_links;
+  $('statImages').textContent = d.total_images;
+}
+
+// ── 加载文件列表 ──
+let currentFile = null;
+
+async function loadFiles() {
+  const r = await fetch('/api/files');
+  const files = await r.json();
+  const tbody = $('fileTableBody');
+  $('fileEmpty').style.display = files.length ? 'none' : 'block';
+
+  tbody.innerHTML = files.map(f =>
+    `<tr data-file="${f.name}" class="${currentFile === f.name ? 'file-active' : ''}"
+         onclick="selectFile('${f.name}')">
+      <td>${f.name}</td>
+      <td>${fmtSize(f.size)}</td>
+      <td>${fmtTime(f.mtime)}</td>
+    </tr>`
+  ).join('');
+}
+
+// ── 选择文件查看详情 ──
+async function selectFile(name) {
+  currentFile = name;
+  showLoading(true);
+  $('detailPanel').style.display = 'none';
+  loadFiles(); // 刷新高亮
+
+  try {
+    const r = await fetch(`/api/data/${encodeURIComponent(name)}`);
+    const data = await r.json();
+    renderDetail(data);
+    $('detailPanel').style.display = 'block';
+  } catch(e) {
+    $('detailBody').innerHTML = `<div class="empty">加载失败: ${e.message}</div>`;
+    $('detailPanel').style.display = 'block';
+  }
+  showLoading(false);
+}
+
+// ── 渲染详情 ──
+function renderDetail(data) {
+  const items = Array.isArray(data) ? data : (data ? [data] : []);
+  const body = $('detailBody');
+
+  if (items.length === 0) {
+    body.innerHTML = '<div class="empty">该文件暂无数据</div>';
+    $('detailTitle').textContent = '';
+    return;
+  }
+
+  // 多页面摘要
+  let html = '';
+  if (items.length > 1) {
+    html += `<div class="detail-section"><h3>📊 概览</h3><p>共 ${items.length} 个页面</p></div>`;
+  }
+
+  // 每个页面
+  items.forEach((page, idx) => {
+    const idxLabel = items.length > 1 ? `#${idx + 1} ` : '';
+    $('detailTitle').textContent = `${idxLabel}${page.title || '(无标题)'}`;
+
+    html += `<div class="detail-section">`;
+
+    // Meta
+    html += `<h3>🔗 基本信息</h3>
+      <ul>
+        <li><strong>URL:</strong> <a href="${page.url}" target="_blank">${page.url}</a></li>
+        <li><strong>标题:</strong> ${page.title || '-'}</li>
+        <li><strong>描述:</strong> ${page.meta_description || '-'}</li>
+        <li><strong>状态码:</strong> ${page.status_code}</li>
+      </ul>`;
+
+    // 标题结构
+    if (page.headings && Object.keys(page.headings).length) {
+      html += `<h3>📑 标题结构</h3><div class="headings-tree">`;
+      for (const [tag, items] of Object.entries(page.headings)) {
+        items.forEach(t => {
+          html += `<div class="${tag}"><strong>${tag}:</strong> ${t}</div>`;
+        });
+      }
+      html += `</div>`;
+    }
+
+    // 链接
+    if (page.links && page.links.length) {
+      html += `<h3>🔗 链接 <span class="badge">${page.links.length}</span></h3><ul>`;
+      page.links.slice(0, 20).forEach(link => {
+        html += `<li><a href="${link.url}" target="_blank">${link.text || link.url}</a></li>`;
+      });
+      if (page.links.length > 20) {
+        html += `<li style="color:#999">... 还有 ${page.links.length - 20} 个链接</li>`;
+      }
+      html += `</ul>`;
+    }
+
+    // 图片
+    if (page.images && page.images.length) {
+      html += `<h3>🖼️ 图片 <span class="badge">${page.images.length}</span></h3><ul>`;
+      page.images.slice(0, 10).forEach(img => {
+        html += `<li><a href="${img.src}" target="_blank">${img.alt || img.src}</a></li>`;
+      });
+      if (page.images.length > 10) {
+        html += `<li style="color:#999">... 还有 ${page.images.length - 10} 张图片</li>`;
+      }
+      html += `</ul>`;
+    }
+
+    // 纯文本预览
+    if (page.text) {
+      const preview = page.text.length > 2000 ? page.text.slice(0, 2000) + '\n... (截断)' : page.text;
+      html += `<h3>📝 文本预览 <span class="badge">${page.text.length} 字符</span></h3>
+        <div class="text-preview">${escapeHtml(preview)}</div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  body.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── 初始化 ──
+async function init() {
+  showLoading(true);
+  await Promise.all([loadStats(), loadFiles()]);
+  // 自动选中第一个文件
+  const firstRow = document.querySelector('#fileTableBody tr');
+  if (firstRow) firstRow.click();
+  showLoading(false);
+}
+
+init();
+</script>
+</body>
+</html>
